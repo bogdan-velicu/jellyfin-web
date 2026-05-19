@@ -646,8 +646,15 @@ export default function (view) {
 
     function onPromptSkip(e, mediaSegment) {
         const player = this;
-        if (mediaSegment && player && mediaSegment.EndTicks != null
-            && mediaSegment.EndTicks >= playbackManager.duration(player)
+        // Only fire on Outro segments (end credits). The previous
+        // EndTicks >= duration check trivially passed when duration hadn't
+        // loaded yet (=0), causing the prompt to appear early on any segment.
+        const durationTicks = playbackManager.duration(player);
+        if (mediaSegment && player
+            && mediaSegment.Type === 'Outro'
+            && mediaSegment.EndTicks != null
+            && durationTicks > 0
+            && mediaSegment.EndTicks >= durationTicks
             && playbackManager.getNextItem()
             && userSettings.enableNextVideoInfoOverlay()
         ) {
