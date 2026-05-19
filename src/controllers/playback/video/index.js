@@ -684,20 +684,30 @@ export default function (view) {
     function showComingUpNext(player) {
         import('../../../components/upnextdialog/upnextdialog').then(({ default: UpNextDialog }) => {
             const blockingMenu = currentVisibleMenu && currentVisibleMenu !== 'osd';
-            if (!blockingMenu && !currentUpNextDialog) {
-                // Preserve currentVisibleMenu='osd' so the OSD's hide timer
-                // can still tear itself down via hideMainOsdControls.
-                if (!currentVisibleMenu) currentVisibleMenu = 'upnext';
-                comingUpNextDisplayed = true;
-                playbackManager.nextItem(player).then(function (nextItem) {
-                    currentUpNextDialog = new UpNextDialog({
-                        parent: view.querySelector('.upNextContainer'),
-                        player: player,
-                        nextItem: nextItem
-                    });
-                    Events.on(currentUpNextDialog, 'hide', onUpNextHidden);
-                }, onUpNextHidden);
+            if (blockingMenu || currentUpNextDialog) return;
+
+            // Defense in depth: callers like onPromptSkip don't time-gate
+            // before invoking us, so verify we're actually near the end before
+            // showing the prompt (avoid "Playing in 500 seconds…").
+            const runtimeTicks = playbackManager.duration(player) * 10000;
+            const currentTimeTicks = playbackManager.currentTime(player) * 10000;
+            if (runtimeTicks && currentTimeTicks
+                    && (runtimeTicks - currentTimeTicks) > 60 * TICKS_PER_SECOND) {
+                return;
             }
+
+            // Preserve currentVisibleMenu='osd' so the OSD's hide timer
+            // can still tear itself down via hideMainOsdControls.
+            if (!currentVisibleMenu) currentVisibleMenu = 'upnext';
+            comingUpNextDisplayed = true;
+            playbackManager.nextItem(player).then(function (nextItem) {
+                currentUpNextDialog = new UpNextDialog({
+                    parent: view.querySelector('.upNextContainer'),
+                    player: player,
+                    nextItem: nextItem
+                });
+                Events.on(currentUpNextDialog, 'hide', onUpNextHidden);
+            }, onUpNextHidden);
         });
     }
 
